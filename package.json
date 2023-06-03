@@ -1,0 +1,21 @@
+{
+  "name": "car-auction-scraping",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "volta": {
+    "node": "18.16.0",
+    "npm": "9.6.7"
+  },
+  "dependencies": {
+    "dotenv": "^16.1.3",
+    "playwright": "^1.33.0"
+  }
+}
