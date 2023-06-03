@@ -1,7 +1,18 @@
-import { chromium, devices } from 'playwright';
+import playwright, { devices } from 'playwright';
+import chromium from 'chrome-aws-lambda';
 
 export async function collectAuctions() {
-  const browser = await chromium.launch({ headless: false });
+  const browser =
+    process.env.NODE_ENV === 'development'
+      ? await playwright.chromium.launch({
+          headless: false,
+        })
+      : await playwright.chromium.launch({
+          args: chromium.args,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+        });
+
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
 
@@ -142,7 +153,16 @@ const getCarModel = async (auctionId, page) => {
 };
 
 export async function scrapAuctions(auctionIds) {
-  const browser = await chromium.launch({ headless: false });
+  const browser =
+    process.env.NODE_ENV === 'development'
+      ? await playwright.chromium.launch({
+          headless: false,
+        })
+      : await playwright.chromium.launch({
+          args: chromium.args,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+        });
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
 
@@ -161,7 +181,7 @@ export async function scrapAuctions(auctionIds) {
 
   for (const auctionId of auctionIds) {
     // TODO - remove to handle all records
-    if (cars.length === 10) break;
+    // if (cars.length === 3) break;
 
     const car = await getCarModel(auctionId, page);
     cars.push(car);

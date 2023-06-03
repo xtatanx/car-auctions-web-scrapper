@@ -1,4 +1,5 @@
-import { chromium, devices } from 'playwright';
+import playwright, { devices } from 'playwright';
+import chromium from 'chrome-aws-lambda';
 
 async function proQuoteCar(car, page) {
   await page.goto('https://seller.copart.com/home.html');
@@ -123,7 +124,16 @@ async function proQuoteCar(car, page) {
 }
 
 export async function getViableCars(cars) {
-  const browser = await chromium.launch({ headless: false });
+  const browser =
+    process.env.NODE_ENV === 'development'
+      ? await playwright.chromium.launch({
+          headless: false,
+        })
+      : await playwright.chromium.launch({
+          args: chromium.args,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+        });
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
 
