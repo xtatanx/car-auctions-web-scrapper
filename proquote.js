@@ -1,22 +1,7 @@
 import { chromium, devices } from 'playwright';
 
-async function proQuoteCar(car) {
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext(devices['Desktop Chrome']);
-  const page = await context.newPage();
-
-  await page.goto('https://seller.copart.com/login.html');
-
-  const emailInput = await page.$('#username');
-  await emailInput.fill(process.env.PROQUOTE_USER);
-  const passInput = await page.$('#password');
-  await passInput.fill(process.env.PROQUOTE_PASS);
-  const SignInBtn = page.getByRole('button', {
-    name: /sign into your account/i,
-  });
-  await SignInBtn.click();
-
-  await page.waitForURL('**/home.html');
+async function proQuoteCar(car, page) {
+  await page.goto('https://seller.copart.com/home.html');
 
   const proQuoteServicesBtn = page.locator(
     'a[data-uname="proquoteservicesHeader"]'
@@ -46,7 +31,7 @@ async function proQuoteCar(car) {
 
   await page.evaluate(async () => {
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    await delay(200);
+    await delay(500);
   });
 
   await submitProQuoteBtn.click();
@@ -127,9 +112,6 @@ async function proQuoteCar(car) {
       .replace(',', '')
   );
 
-  await context.close();
-  await browser.close();
-
   if (car.price <= avgValue) {
     return {
       ...car,
@@ -141,15 +123,35 @@ async function proQuoteCar(car) {
 }
 
 export async function getViableCars(cars) {
+  const browser = await chromium.launch({ headless: false });
+  const context = await browser.newContext(devices['Desktop Chrome']);
+  const page = await context.newPage();
+
+  await page.goto('https://seller.copart.com/login.html');
+
+  const emailInput = await page.$('#username');
+  await emailInput.fill(process.env.PROQUOTE_USER);
+  const passInput = await page.$('#password');
+  await passInput.fill(process.env.PROQUOTE_PASS);
+  const SignInBtn = page.getByRole('button', {
+    name: /sign into your account/i,
+  });
+  await SignInBtn.click();
+
+  await page.waitForURL('**/home.html');
+
   const viableCars = [];
 
   for (const car of cars) {
-    const viableCar = await proQuoteCar(car);
+    const viableCar = await proQuoteCar(car, page);
 
     if (viableCar) {
       viableCars.push(viableCar);
     }
   }
+
+  await context.close();
+  await browser.close();
 
   return viableCars;
 }
