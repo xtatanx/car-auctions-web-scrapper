@@ -76,6 +76,11 @@ async function proQuoteCar(car, page) {
     .locator('select[data-uname="prqtFieldDrivRatingDropdown"]')
     .selectOption({ label: 'DRIVES' });
 
+  await page.evaluate(async () => {
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    await delay(500);
+  });
+
   await page.locator('button[data-uname="prqtFieldGeneratePrqtBtn"]').click();
 
   await page.waitForURL('**/proquote.html/proquoteresults');
@@ -110,6 +115,10 @@ async function proQuoteCar(car, page) {
 
   console.log(avgValueTxt);
 
+  if (!avgValueTxt.split('\n')[1]) {
+    return null;
+  }
+
   const avgValue = parseFloat(
     avgValueTxt.split('\n')[1].replace('$', '').replace(',', '')
   );
@@ -122,6 +131,8 @@ async function proQuoteCar(car, page) {
       },
     };
   }
+
+  return null;
 }
 
 export async function getViableCars(cars) {
@@ -153,6 +164,9 @@ export async function getViableCars(cars) {
   const viableCars = [];
 
   for (const car of cars) {
+    console.log(`::: Initiated proquote :::`);
+    console.log(cars.indexOf(car));
+    console.log(car);
     const viableCar = await proQuoteCar(car, page);
 
     if (viableCar) {
