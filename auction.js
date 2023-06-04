@@ -18,12 +18,13 @@ export async function collectAuctions() {
 
   await page.goto('https://app.acvauctions.com/login');
 
-  const email = await page.$('#login_email');
-  email.fill(process.env.ACV_AUCTIONS_USER);
-  const pass = await page.$('#login_password');
-  pass.fill(process.env.ACV_AUCTIONS_PASS);
-  const submitBtn = await page.$('#login_button');
-  submitBtn.click();
+  await page
+    .getByRole('textbox', { name: /email address/i })
+    .fill(process.env.ACV_AUCTIONS_USER);
+  await page
+    .getByRole('textbox', { name: /password/i })
+    .fill(process.env.ACV_AUCTIONS_PASS);
+  await page.getByRole('button', { name: /log in/i }).click();
 
   await page.waitForURL('**/search');
 
@@ -168,12 +169,13 @@ export async function scrapAuctions(auctionIds) {
 
   await page.goto('https://app.acvauctions.com/login');
 
-  const email = await page.$('#login_email');
-  email.fill(process.env.ACV_AUCTIONS_USER);
-  const pass = await page.$('#login_password');
-  pass.fill(process.env.ACV_AUCTIONS_PASS);
-  const submitBtn = await page.$('#login_button');
-  submitBtn.click();
+  await page
+    .getByRole('textbox', { name: /email address/i })
+    .fill(process.env.ACV_AUCTIONS_USER);
+  await page
+    .getByRole('textbox', { name: /password/i })
+    .fill(process.env.ACV_AUCTIONS_PASS);
+  await page.getByRole('button', { name: /log in/i }).click();
 
   await page.waitForURL('**/search');
 

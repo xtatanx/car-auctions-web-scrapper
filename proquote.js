@@ -20,13 +20,15 @@ async function proQuoteCar(car, page) {
 
   await page.waitForURL('**/proquote.html');
 
-  const vehicleTypeSelect = await page.$(
+  const vehicleTypeSelect = await page.locator(
     '[data-uname="prqthomeVehicleTypeDropdown"]'
   );
   await vehicleTypeSelect.selectOption({
     label: 'AUTOMOBILE',
   });
-  const vehicleVinInput = await page.$('[data-uname="prqthomeVINTxtBox"]');
+  const vehicleVinInput = await page.locator(
+    '[data-uname="prqthomeVINTxtBox"]'
+  );
   await vehicleVinInput.fill(car.vin);
   const submitProQuoteBtn = await page.locator('[data-uname="prqthomeGoBtn"]');
 
@@ -100,17 +102,16 @@ async function proQuoteCar(car, page) {
 
   await responsePromise;
 
+  const avgValueTxt = await page
+    .locator('p', {
+      hasText: 'Average Value',
+    })
+    .innerText();
+
+  console.log(avgValueTxt);
+
   const avgValue = parseFloat(
-    (
-      await page
-        .locator('p', {
-          hasText: 'Average Value',
-        })
-        .innerText()
-    )
-      .split('\n')[1]
-      .replace('$', '')
-      .replace(',', '')
+    avgValueTxt.split('\n')[1].replace('$', '').replace(',', '')
   );
 
   if (car.price <= avgValue) {
@@ -139,14 +140,13 @@ export async function getViableCars(cars) {
 
   await page.goto('https://seller.copart.com/login.html');
 
-  const emailInput = await page.$('#username');
-  await emailInput.fill(process.env.PROQUOTE_USER);
-  const passInput = await page.$('#password');
-  await passInput.fill(process.env.PROQUOTE_PASS);
-  const SignInBtn = page.getByRole('button', {
-    name: /sign into your account/i,
-  });
-  await SignInBtn.click();
+  await page.locator('#username').fill(process.env.PROQUOTE_USER);
+  await page.locator('#password').fill(process.env.PROQUOTE_PASS);
+  page
+    .getByRole('button', {
+      name: /sign into your account/i,
+    })
+    .click();
 
   await page.waitForURL('**/home.html');
 

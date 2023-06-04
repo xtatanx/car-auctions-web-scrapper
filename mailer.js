@@ -2,11 +2,11 @@ import nodemailer from 'nodemailer';
 
 export async function sendReport(viableCars) {
   const transport = nodemailer.createTransport({
-    host: 'sandbox.smtp.mailtrap.io',
+    host: process.env.NODEMAILER_HOST,
     port: 2525,
     auth: {
-      user: '7c23ff5f944818',
-      pass: '61adaec2fa5f6f',
+      user: process.env.MAIL_TRAP_USER,
+      pass: process.env.MAIL_TRAP_PASS,
     },
   });
 
@@ -14,7 +14,8 @@ export async function sendReport(viableCars) {
     from: 'Jhonnatan <jhonnatanhxc@gmail.com>',
     to: 'jhonnatanhxc@gmail.com',
     subject: 'Your daily dose of auctions',
-    text: `This is a series of auctions you might be interested:
+    text: viableCars.length
+      ? `This is a series of auctions you might be interested:
     
     ${viableCars
       .map(
@@ -37,6 +38,7 @@ export async function sendReport(viableCars) {
       .join('\n')}
   
     Regards
-    `,
+    `
+      : `Hello, we were not able to find any good matches in the current run. Enjoy your day.`,
   });
 }
