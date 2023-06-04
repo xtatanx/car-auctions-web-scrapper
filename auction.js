@@ -183,7 +183,7 @@ export async function scrapAuctions(auctionIds) {
 
   for (const auctionId of auctionIds) {
     // TODO - remove to handle all records
-    // if (cars.length === 15) break;
+    // if (cars.length === 10) break;
 
     const car = await getCarModel(auctionId, page);
     cars.push(car);

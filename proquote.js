@@ -19,7 +19,8 @@ async function proQuoteCar(car) {
 
   await page.locator('#username').fill(process.env.PROQUOTE_USER);
   await page.locator('#password').fill(process.env.PROQUOTE_PASS);
-  page
+
+  await page
     .getByRole('button', {
       name: /sign into your account/i,
     })
@@ -39,9 +40,8 @@ async function proQuoteCar(car) {
   proQuoteBtn.waitFor({
     state: 'visible',
   });
-  await proQuoteBtn.click();
 
-  await page.waitForURL('**/proquote.html');
+  await Promise.all([proQuoteBtn.click(), page.waitForURL('**/proquote.html')]);
 
   const vehicleTypeSelect = await page.locator(
     '[data-uname="prqthomeVehicleTypeDropdown"]'
@@ -104,9 +104,10 @@ async function proQuoteCar(car) {
     await delay(500);
   });
 
-  await page.locator('button[data-uname="prqtFieldGeneratePrqtBtn"]').click();
-
-  await page.waitForURL('**/proquote.html/proquoteresults');
+  await Promise.all([
+    page.click('button[data-uname="prqtFieldGeneratePrqtBtn"]'),
+    page.waitForURL('**/proquote.html/proquoteresults'),
+  ]);
 
   await page
     .getByRole('button', {
