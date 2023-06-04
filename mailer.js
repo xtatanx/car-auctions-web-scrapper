@@ -1,18 +1,35 @@
 import nodemailer from 'nodemailer';
 
-export async function sendReport(viableCars) {
-  const transport = nodemailer.createTransport({
-    host: process.env.NODEMAILER_HOST,
-    port: 2525,
+function getTransport() {
+  if (process.env.NODE_ENV === 'development') {
+    return nodemailer.createTransport({
+      host: process.env.NODEMAILER_HOST,
+      port: 2525,
+      auth: {
+        user: process.env.MAIL_TRAP_USER,
+        pass: process.env.MAIL_TRAP_PASS,
+      },
+    });
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
-      user: process.env.MAIL_TRAP_USER,
-      pass: process.env.MAIL_TRAP_PASS,
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASS,
     },
   });
+}
+
+export async function sendReport(viableCars) {
+  const transport = getTransport();
 
   await transport.sendMail({
-    from: 'Jhonnatan <jhonnatanhxc@gmail.com>',
-    to: 'jhonnatanhxc@gmail.com',
+    from: process.env.MAIL_FROM,
+    to: process.env.MAIL_TO,
     subject: 'Your daily dose of auctions',
     text: viableCars.length
       ? `This is a series of auctions you might be interested:
