@@ -1,8 +1,31 @@
 import playwright, { devices } from 'playwright';
 import chromium from 'chrome-aws-lambda';
 
-async function proQuoteCar(car, page) {
-  await page.goto('https://seller.copart.com/home.html');
+async function proQuoteCar(car) {
+  const browser =
+    process.env.NODE_ENV === 'development'
+      ? await playwright.chromium.launch({
+          headless: false,
+        })
+      : await playwright.chromium.launch({
+          args: chromium.args,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+        });
+  const context = await browser.newContext(devices['Desktop Chrome']);
+  const page = await context.newPage();
+
+  await page.goto('https://seller.copart.com/login.html');
+
+  await page.locator('#username').fill(process.env.PROQUOTE_USER);
+  await page.locator('#password').fill(process.env.PROQUOTE_PASS);
+  page
+    .getByRole('button', {
+      name: /sign into your account/i,
+    })
+    .click();
+
+  await page.waitForURL('**/home.html');
 
   const proQuoteServicesBtn = page.locator(
     'a[data-uname="proquoteservicesHeader"]'
@@ -123,6 +146,9 @@ async function proQuoteCar(car, page) {
     avgValueTxt.split('\n')[1].replace('$', '').replace(',', '')
   );
 
+  await context.close();
+  await browser.close();
+
   if (car.price <= avgValue) {
     return {
       ...car,
@@ -136,46 +162,18 @@ async function proQuoteCar(car, page) {
 }
 
 export async function getViableCars(cars) {
-  const browser =
-    process.env.NODE_ENV === 'development'
-      ? await playwright.chromium.launch({
-          headless: false,
-        })
-      : await playwright.chromium.launch({
-          args: chromium.args,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless,
-        });
-  const context = await browser.newContext(devices['Desktop Chrome']);
-  const page = await context.newPage();
-
-  await page.goto('https://seller.copart.com/login.html');
-
-  await page.locator('#username').fill(process.env.PROQUOTE_USER);
-  await page.locator('#password').fill(process.env.PROQUOTE_PASS);
-  page
-    .getByRole('button', {
-      name: /sign into your account/i,
-    })
-    .click();
-
-  await page.waitForURL('**/home.html');
-
   const viableCars = [];
 
   for (const car of cars) {
     console.log(`::: Initiated proquote :::`);
     console.log(cars.indexOf(car));
     console.log(car);
-    const viableCar = await proQuoteCar(car, page);
+    const viableCar = await proQuoteCar(car);
 
     if (viableCar) {
       viableCars.push(viableCar);
     }
   }
-
-  await context.close();
-  await browser.close();
 
   return viableCars;
 }
