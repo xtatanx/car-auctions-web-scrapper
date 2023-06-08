@@ -26,7 +26,7 @@ export async function collectAuctions() {
     .fill(process.env.ACV_AUCTIONS_PASS);
   await page.getByRole('button', { name: /log in/i }).click();
 
-  await page.waitForURL('**/search');
+  // await page.waitForURL('**/search');
 
   const endedAuctionsBtn = page.locator('#parent-radio-ended_auctions');
   await endedAuctionsBtn.waitFor({ state: 'attached' });
@@ -177,13 +177,14 @@ export async function scrapAuctions(auctionIds) {
     .fill(process.env.ACV_AUCTIONS_PASS);
   await page.getByRole('button', { name: /log in/i }).click();
 
-  await page.waitForURL('**/search');
+  const endedAuctionsBtn = page.locator('#parent-radio-ended_auctions');
+  await endedAuctionsBtn.waitFor({ state: 'attached' });
 
   const cars = [];
 
   for (const auctionId of auctionIds) {
     // TODO - remove to handle all records
-    // if (cars.length === 10) break;
+    // if (cars.length === 35) break;
 
     const car = await getCarModel(auctionId, page);
     cars.push(car);

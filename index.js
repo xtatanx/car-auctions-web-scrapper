@@ -1,25 +1,16 @@
 import dotenv from 'dotenv';
-import { collectAuctions, scrapAuctions } from './auction.js';
-import { getViableCars } from './proquote.js';
 import functions from '@google-cloud/functions-framework';
-import { sendReport } from './mailer.js';
+import { init } from './scrapper.js';
 
 dotenv.config();
 
 functions.http('initScrapping', async (_, res) => {
   try {
-    const auctionIds = await collectAuctions();
-    const carsToCompare = await scrapAuctions(auctionIds);
-    const viableCars = await getViableCars(carsToCompare);
-    await sendReport(viableCars);
-
-    console.log('::::  viable cars :::::');
-    console.log(viableCars.length);
-    console.log(viableCars);
-
+    await init();
     res.send('done');
   } catch (e) {
-    res.status(400).send(e);
+    console.log('::: main catch :::');
     console.log(e);
+    res.status(400).send(e);
   }
 });
