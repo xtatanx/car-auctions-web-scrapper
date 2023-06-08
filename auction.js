@@ -48,8 +48,12 @@ export async function collectAuctions() {
     .innerText();
 
   const total = parseInt(totalResultsText.split(' ')[0]);
+  console.log('::: Total results :::');
+  console.log(total);
 
   const auctionIds = [];
+  const LIMIT = 120000;
+  const now = Date.now();
   let shouldCollect = true;
 
   while (shouldCollect) {
@@ -80,6 +84,10 @@ export async function collectAuctions() {
 
     if (auctionIds.length === total) {
       shouldCollect = false;
+    }
+
+    if (Math.floor((Date.now() - now) / 1000) > LIMIT) {
+      throw new Error('Timeout to collect auctions');
     }
   }
 
