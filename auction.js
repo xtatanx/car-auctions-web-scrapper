@@ -38,7 +38,16 @@ export async function collectAuctions() {
 
   const filterToggle = page.locator('#saved-search-261859');
   await filterToggle.waitFor({ state: 'attached' });
-  filterToggle.evaluate((node) => node.click());
+
+  await filterToggle.evaluate((node) => node.click());
+
+  const totalResultsText = await page
+    .locator('.result-number', {
+      hasNotText: '0 Results Total Match Your 1 Saved Search',
+    })
+    .innerText();
+
+  const total = parseInt(totalResultsText.split(' ')[0]);
 
   const auctionIds = [];
   let shouldCollect = true;
@@ -47,22 +56,29 @@ export async function collectAuctions() {
     const responsePromise = page.waitForResponse(
       'https://easy-pass.acvauctions.com/bff/filters/auctions/buying/ended'
     );
-    const response = await responsePromise;
+
+    await page.evaluate(async () => {
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    const response = await responsePromise.catch(() => null);
+
+    if (!response) {
+      continue;
+    }
 
     if (response.status() === 200) {
       const {
         data: { results },
       } = await response.json();
+      console.log(results.length);
 
-      if (results.length !== 0) {
-        auctionIds.push(...results.map((result) => result.id));
-        await page.evaluate(async () => {
-          window.scrollTo(0, document.body.scrollHeight);
-        });
-      } else {
-        shouldCollect = false;
-      }
+      auctionIds.push(...results.map((result) => result.id));
     } else {
+      shouldCollect = false;
+    }
+
+    if (auctionIds.length === total) {
       shouldCollect = false;
     }
   }
