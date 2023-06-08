@@ -90,83 +90,88 @@ export async function collectAuctions() {
 }
 
 const getCarModel = async (auctionId, page) => {
-  await page.goto(`https://app.acvauctions.com/auction/${auctionId}`);
+  try {
+    await page.goto(`https://app.acvauctions.com/auction/${auctionId}`);
 
-  const propertiesToSave = [
-    'city',
-    'vin',
-    'odometer',
-    'auction id',
-    'auction date',
-    'make',
-    'model',
-    'year',
-    'color',
-  ];
+    const propertiesToSave = [
+      'city',
+      'vin',
+      'odometer',
+      'auction id',
+      'auction date',
+      'make',
+      'model',
+      'year',
+      'color',
+    ];
 
-  let carModel = {};
+    let carModel = {};
 
-  const title = page.locator('.vehicle-header-summary__name');
-  await title.waitFor({
-    state: 'visible',
-  });
+    const title = page.locator('.vehicle-header-summary__name');
+    await title.waitFor({
+      state: 'visible',
+    });
 
-  carModel.title = await title.innerText();
+    carModel.title = await title.innerText();
 
-  carModel.condition = [];
+    carModel.condition = [];
 
-  const condition = await page.locator('.condition-report');
-  const isInoperable = await condition.getByText(
-    /vehicle inop \(does not move\)/i
-  );
+    const condition = await page.locator('.condition-report');
+    const isInoperable = await condition.getByText(
+      /vehicle inop \(does not move\)/i
+    );
 
-  if ((await isInoperable.count()) === 1) {
-    carModel.condition.push('isInoperable');
-  }
+    if ((await isInoperable.count()) === 1) {
+      carModel.condition.push('isInoperable');
+    }
 
-  const doesNotStart = await condition.getByText(
-    /engine cranks\, does not start/i
-  );
+    const doesNotStart = await condition.getByText(
+      /engine cranks\, does not start/i
+    );
 
-  if ((await doesNotStart.count()) === 1) {
-    carModel.condition.push('doesNotStart');
-  }
+    if ((await doesNotStart.count()) === 1) {
+      carModel.condition.push('doesNotStart');
+    }
 
-  const price = await page.locator('.price').first();
-  carModel.price = parseInt(
-    (await price.innerText()).replace('$', '').replace(',', '')
-  );
+    const price = await page.locator('.price').first();
+    carModel.price = parseInt(
+      (await price.innerText()).replace('$', '').replace(',', '')
+    );
 
-  const details = await page.locator('.auction-vehicle-details');
+    const details = await page.locator('.auction-vehicle-details');
 
-  const tableRows = await details.locator('tr').all();
+    const tableRows = await details.locator('tr').all();
 
-  for (const row of tableRows) {
-    const label = (await row.locator('.left').innerText()).toLowerCase();
-    const value = await row.locator('.right').innerText();
+    for (const row of tableRows) {
+      const label = (await row.locator('.left').innerText()).toLowerCase();
+      const value = await row.locator('.right').innerText();
 
-    if (propertiesToSave.includes(label)) {
-      if (label === 'odometer') {
-        carModel[label] = {
-          type: 'miles',
-          value:
-            value === 'True Mileage Unknown'
-              ? -1
-              : parseInt(value.replace(',', '')),
-        };
-      } else if (label === 'year') {
-        carModel[label] = parseInt(value);
-      } else if (label === 'auction date') {
-        carModel.auctionDate = value;
-      } else if (label === 'auction id') {
-        carModel.auctionId = parseInt(value);
-      } else {
-        carModel[label] = value;
+      if (propertiesToSave.includes(label)) {
+        if (label === 'odometer') {
+          carModel[label] = {
+            type: 'miles',
+            value:
+              value === 'True Mileage Unknown'
+                ? -1
+                : parseInt(value.replace(',', '')),
+          };
+        } else if (label === 'year') {
+          carModel[label] = parseInt(value);
+        } else if (label === 'auction date') {
+          carModel.auctionDate = value;
+        } else if (label === 'auction id') {
+          carModel.auctionId = parseInt(value);
+        } else {
+          carModel[label] = value;
+        }
       }
     }
-  }
 
-  return carModel;
+    return carModel;
+  } catch (e) {
+    console.log(e);
+    return null;
+  }
 };
 
 export async function scrapAuctions(auctionIds) {
@@ -203,7 +208,10 @@ export async function scrapAuctions(auctionIds) {
     // if (cars.length === 35) break;
 
     const car = await getCarModel(auctionId, page);
-    cars.push(car);
+
+    if (car) {
+      cars.push(car);
+    }
   }
 
   const result = cars.filter((car) => {
