@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer';
+import { isDev } from './utils';
 
 function getTransport() {
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev()) {
     return nodemailer.createTransport({
       host: process.env.NODEMAILER_HOST,
       port: 2525,

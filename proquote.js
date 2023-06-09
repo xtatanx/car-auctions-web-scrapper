@@ -1,17 +1,17 @@
 import playwright, { devices } from 'playwright';
 import chromium from 'chrome-aws-lambda';
+import { isDev } from './utils';
 
 export async function proQuoteCar(car) {
-  const browser =
-    process.env.NODE_ENV === 'development'
-      ? await playwright.chromium.launch({
-          headless: false,
-        })
-      : await playwright.chromium.launch({
-          args: chromium.args,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless,
-        });
+  const browser = isDev()
+    ? await playwright.chromium.launch({
+        headless: false,
+      })
+    : await playwright.chromium.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+      });
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
   let avgValue;

@@ -1,17 +1,17 @@
 import playwright, { devices } from 'playwright';
 import chromium from 'chrome-aws-lambda';
+import { isDev } from './utils';
 
 export async function collectAuctions() {
-  const browser =
-    process.env.NODE_ENV === 'development'
-      ? await playwright.chromium.launch({
-          headless: false,
-        })
-      : await playwright.chromium.launch({
-          args: chromium.args,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless,
-        });
+  const browser = isDev()
+    ? await playwright.chromium.launch({
+        headless: false,
+      })
+    : await playwright.chromium.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+      });
 
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
@@ -30,169 +30,148 @@ export async function collectAuctions() {
 
   const endedAuctionsBtn = page.locator('#parent-radio-ended_auctions');
   await endedAuctionsBtn.waitFor({ state: 'attached' });
-  endedAuctionsBtn.evaluate((node) => node.click());
+  await endedAuctionsBtn.evaluate((node) => node.click());
 
   const makeOfferBtn = page.locator('label').filter({ hasText: 'Make Offer' });
   await makeOfferBtn.waitFor({ state: 'visible' });
-  makeOfferBtn.evaluate((node) => node.click());
+  await makeOfferBtn.evaluate((node) => node.click());
 
   const filterToggle = page.locator('#saved-search-261859');
   await filterToggle.waitFor({ state: 'attached' });
 
   await filterToggle.evaluate((node) => node.click());
 
-  const totalResultsText = await page
-    .locator('.result-number', {
-      hasNotText: '0 Results Total Match Your 1 Saved Search',
-    })
-    .innerText();
-
-  const total = parseInt(totalResultsText.split(' ')[0]);
-  console.log('::: Total results :::');
-  console.log(total);
-
-  const auctionIds = [];
-  const LIMIT = 120000;
+  const auctionIds = new Set();
+  const LIMIT = 30;
   const now = Date.now();
   let shouldCollect = true;
 
   while (shouldCollect) {
-    const responsePromise = page.waitForResponse(
-      'https://easy-pass.acvauctions.com/bff/filters/auctions/buying/ended'
-    );
+    try {
+      for (let car of await page.locator('.acv-infinite-scroller-item').all()) {
+        const link = await car.locator('a');
+        const href = await link.getAttribute('href');
+        auctionIds.add(href.match(/\d+/)[0]);
+      }
 
-    await page.evaluate(async () => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
+      console.log('::: auctionIds.length :::');
+      console.log(auctionIds.size);
 
-    const response = await responsePromise.catch(() => null);
+      await page.evaluate(async () => {
+        window.scrollTo(0, window.scrollY + 1000);
 
-    if (!response) {
-      continue;
+        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        await delay(500);
+      });
+    } catch (e) {
+      await context.close();
+      await browser.close();
+      throw new Error(e);
     }
 
-    if (response.status() === 200) {
-      const {
-        data: { results },
-      } = await response.json();
-      console.log(results.length);
-
-      auctionIds.push(...results.map((result) => result.id));
-    } else {
-      shouldCollect = false;
-    }
-
-    if (auctionIds.length === total) {
-      shouldCollect = false;
-    }
-
+    console.log('::: timer :::');
+    console.log(Math.floor((Date.now() - now) / 1000));
     if (Math.floor((Date.now() - now) / 1000) > LIMIT) {
-      throw new Error('Timeout to collect auctions');
+      shouldCollect = false;
     }
   }
 
   await context.close();
   await browser.close();
 
-  return auctionIds;
+  return [...auctionIds];
 }
 
 const getCarModel = async (auctionId, page) => {
-  try {
-    await page.goto(`https://app.acvauctions.com/auction/${auctionId}`);
+  await page.goto(`https://app.acvauctions.com/auction/${auctionId}`);
 
-    const propertiesToSave = [
-      'city',
-      'vin',
-      'odometer',
-      'auction id',
-      'auction date',
-      'make',
-      'model',
-      'year',
-      'color',
-    ];
+  const propertiesToSave = [
+    'city',
+    'vin',
+    'odometer',
+    'auction id',
+    'auction date',
+    'make',
+    'model',
+    'year',
+    'color',
+  ];
 
-    let carModel = {};
+  let carModel = {};
 
-    const title = page.locator('.vehicle-header-summary__name');
-    await title.waitFor({
-      state: 'visible',
-    });
+  const title = page.locator('.vehicle-header-summary__name');
+  await title.waitFor({
+    state: 'visible',
+  });
 
-    carModel.title = await title.innerText();
+  carModel.title = await title.innerText();
 
-    carModel.condition = [];
+  carModel.condition = [];
 
-    const condition = await page.locator('.condition-report');
-    const isInoperable = await condition.getByText(
-      /vehicle inop \(does not move\)/i
-    );
+  const condition = await page.locator('.condition-report');
+  const isInoperable = await condition.getByText(
+    /vehicle inop \(does not move\)/i
+  );
 
-    if ((await isInoperable.count()) === 1) {
-      carModel.condition.push('isInoperable');
-    }
+  if ((await isInoperable.count()) === 1) {
+    carModel.condition.push('isInoperable');
+  }
 
-    const doesNotStart = await condition.getByText(
-      /engine cranks\, does not start/i
-    );
+  const doesNotStart = await condition.getByText(
+    /engine cranks\, does not start/i
+  );
 
-    if ((await doesNotStart.count()) === 1) {
-      carModel.condition.push('doesNotStart');
-    }
+  if ((await doesNotStart.count()) === 1) {
+    carModel.condition.push('doesNotStart');
+  }
 
-    const price = await page.locator('.price').first();
-    carModel.price = parseInt(
-      (await price.innerText()).replace('$', '').replace(',', '')
-    );
+  const price = await page.locator('.price').first();
+  carModel.price = parseInt(
+    (await price.innerText()).replace('$', '').replace(',', '')
+  );
 
-    const details = await page.locator('.auction-vehicle-details');
+  const details = await page.locator('.auction-vehicle-details');
 
-    const tableRows = await details.locator('tr').all();
+  const tableRows = await details.locator('tr').all();
 
-    for (const row of tableRows) {
-      const label = (await row.locator('.left').innerText()).toLowerCase();
-      const value = await row.locator('.right').innerText();
+  for (const row of tableRows) {
+    const label = (await row.locator('.left').innerText()).toLowerCase();
+    const value = await row.locator('.right').innerText();
 
-      if (propertiesToSave.includes(label)) {
-        if (label === 'odometer') {
-          carModel[label] = {
-            type: 'miles',
-            value:
-              value === 'True Mileage Unknown'
-                ? -1
-                : parseInt(value.replace(',', '')),
-          };
-        } else if (label === 'year') {
-          carModel[label] = parseInt(value);
-        } else if (label === 'auction date') {
-          carModel.auctionDate = value;
-        } else if (label === 'auction id') {
-          carModel.auctionId = parseInt(value);
-        } else {
-          carModel[label] = value;
-        }
+    if (propertiesToSave.includes(label)) {
+      if (label === 'odometer') {
+        carModel[label] = {
+          type: 'miles',
+          value:
+            value === 'True Mileage Unknown'
+              ? -1
+              : parseInt(value.replace(',', '')),
+        };
+      } else if (label === 'year') {
+        carModel[label] = parseInt(value);
+      } else if (label === 'auction date') {
+        carModel.auctionDate = value;
+      } else if (label === 'auction id') {
+        carModel.auctionId = parseInt(value);
+      } else {
+        carModel[label] = value;
       }
     }
-
-    return carModel;
-  } catch (e) {
-    console.log(e);
-    return null;
   }
+
+  return carModel;
 };
 
 export async function scrapAuctions(auctionIds) {
-  const browser =
-    process.env.NODE_ENV === 'development'
-      ? await playwright.chromium.launch({
-          headless: false,
-        })
-      : await playwright.chromium.launch({
-          args: chromium.args,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless,
-        });
+  const browser = isDev()
+    ? await playwright.chromium.launch({
+        headless: false,
+      })
+    : await playwright.chromium.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath,
+        headless: chromium.headless,
+      });
   const context = await browser.newContext(devices['Desktop Chrome']);
   const page = await context.newPage();
 
@@ -206,19 +185,20 @@ export async function scrapAuctions(auctionIds) {
     .fill(process.env.ACV_AUCTIONS_PASS);
   await page.getByRole('button', { name: /log in/i }).click();
 
-  const endedAuctionsBtn = page.locator('#parent-radio-ended_auctions');
-  await endedAuctionsBtn.waitFor({ state: 'attached' });
+  await page.waitForURL('https://app.acvauctions.com/search?l=live');
 
   const cars = [];
 
   for (const auctionId of auctionIds) {
-    // TODO - remove to handle all records
-    // if (cars.length === 35) break;
+    try {
+      const car = await getCarModel(auctionId, page);
 
-    const car = await getCarModel(auctionId, page);
-
-    if (car) {
-      cars.push(car);
+      if (car) {
+        cars.push(car);
+      }
+    } catch (e) {
+      console.log('::: scrapAuctions :::');
+      console.log(e);
     }
   }
 
