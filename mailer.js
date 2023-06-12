@@ -1,31 +1,33 @@
 import nodemailer from 'nodemailer';
-import { isDev } from './utils';
+import { isDev } from './utils.js';
+
+const devOptions = {
+  host: process.env.NODEMAILER_HOST,
+  port: 2525,
+  auth: {
+    user: process.env.MAIL_TRAP_USER,
+    pass: process.env.MAIL_TRAP_PASS,
+  },
+};
+
+const options = {
+  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS,
+  },
+};
 
 function getTransport() {
-  if (isDev()) {
-    return nodemailer.createTransport({
-      host: process.env.NODEMAILER_HOST,
-      port: 2525,
-      auth: {
-        user: process.env.MAIL_TRAP_USER,
-        pass: process.env.MAIL_TRAP_PASS,
-      },
-    });
-  }
-
-  return nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS,
-    },
-  });
+  console.log(isDev() ? devOptions : options);
+  return nodemailer.createTransport(isDev() ? devOptions : options);
 }
 
 export async function sendReport(viableCars) {
+  console.log('::: sending mail report :::');
   const transport = getTransport();
 
   await transport.sendMail({

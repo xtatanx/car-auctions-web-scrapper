@@ -1,32 +1,27 @@
-import playwright, { devices } from 'playwright';
-import chromium from 'chrome-aws-lambda';
-import { isDev } from './utils';
+import playwright from 'playwright';
+import { closeBrowser, launchBrowser } from './browserController.js';
+import pLimit from 'p-limit';
+
+export async function login(page) {
+  await page.goto('https://seller.copart.com/login.html');
+
+  await page.locator('#username').fill(process.env.PROQUOTE_USER);
+  await page.locator('#password').fill(process.env.PROQUOTE_PASS);
+
+  await page
+    .getByRole('button', {
+      name: /sign into your account/i,
+    })
+    .click();
+}
 
 export async function proQuoteCar(car) {
-  const browser = isDev()
-    ? await playwright.chromium.launch({
-        headless: false,
-      })
-    : await playwright.chromium.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-      });
-  const context = await browser.newContext(devices['Desktop Chrome']);
-  const page = await context.newPage();
+  const { page, browser, context } = await launchBrowser();
+
   let avgValue;
 
   try {
-    await page.goto('https://seller.copart.com/login.html');
-
-    await page.locator('#username').fill(process.env.PROQUOTE_USER);
-    await page.locator('#password').fill(process.env.PROQUOTE_PASS);
-
-    await page
-      .getByRole('button', {
-        name: /sign into your account/i,
-      })
-      .click();
+    await login(page);
 
     const proQuoteServicesBtn = page.locator(
       'a[data-uname="proquoteservicesHeader"]'
@@ -143,43 +138,64 @@ export async function proQuoteCar(car) {
   } catch (error) {
     if (error instanceof playwright.errors.TimeoutError) {
       console.log('::: Timeout error :::');
-      console.log(error);
+    } else {
+      console.log('::: Error getting proquote :::');
     }
+    console.log(error);
 
-    await context.close();
-    await browser.close();
+    await closeBrowser(browser, context);
 
     return null;
   }
 
-  await context.close();
-  await browser.close();
+  await closeBrowser(browser, context);
 
-  if (car.price <= avgValue) {
-    return {
-      ...car,
-      proQuote: {
-        avg: avgValue,
-      },
-    };
-  }
+  return {
+    ...car,
+    proQuote: {
+      avg: avgValue,
+    },
+  };
+}
 
-  return null;
+function hasOptimalConditions(car) {
+  return (
+    !car.condition.some((report) => {
+      return ['isInoperable', 'doesNotStart'].includes(report);
+    }) && car.odometer.value !== -1
+  );
 }
 
 export async function getViableCars(cars) {
   const viableCars = [];
+  const processedCars = [];
+  const carsToProquote = [];
 
   for (const car of cars) {
-    console.log(`::: Initiated proquote :::`);
-    console.log(cars.indexOf(car));
-    console.log(car);
-    const viableCar = await proQuoteCar(car);
-
-    if (viableCar) {
-      viableCars.push(viableCar);
+    if (hasOptimalConditions(car)) {
+      carsToProquote.push(car);
+    } else {
+      processedCars.push(car);
     }
   }
 
-  return viableCars;
+  const limit = pLimit(5);
+
+  const input = carsToProquote.map((car) => {
+    return limit(() => proQuoteCar(car));
+  });
+
+  const carsWithProquote = await Promise.all(input);
+
+  for (const carWithProquote of carsWithProquote) {
+    if (carWithProquote) {
+      processedCars.push(carWithProquote);
+
+      if (carWithProquote.price <= carWithProquote.proQuote.avg) {
+        viableCars.push(carWithProquote);
+      }
+    }
+  }
+
+  return [viableCars, processedCars];
 }

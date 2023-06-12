@@ -1,8 +1,6 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import functions from '@google-cloud/functions-framework';
 import { init } from './scrapper.js';
-
-dotenv.config();
 
 functions.http('initScrapping', async (_, res) => {
   await init();

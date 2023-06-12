@@ -1,21 +1,7 @@
-import playwright, { devices } from 'playwright';
-import chromium from 'chrome-aws-lambda';
-import { isDev } from './utils';
+import { closeBrowser, launchBrowser } from './browserController.js';
+import { getProcessedAuction } from './data.js';
 
-export async function collectAuctions() {
-  const browser = isDev()
-    ? await playwright.chromium.launch({
-        headless: false,
-      })
-    : await playwright.chromium.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-      });
-
-  const context = await browser.newContext(devices['Desktop Chrome']);
-  const page = await context.newPage();
-
+async function login(page) {
   await page.goto('https://app.acvauctions.com/login');
 
   await page
@@ -25,8 +11,12 @@ export async function collectAuctions() {
     .getByRole('textbox', { name: /password/i })
     .fill(process.env.ACV_AUCTIONS_PASS);
   await page.getByRole('button', { name: /log in/i }).click();
+}
 
-  // await page.waitForURL('**/search');
+export async function collectAuctions() {
+  const { page, browser, context } = await launchBrowser();
+
+  await login(page);
 
   const endedAuctionsBtn = page.locator('#parent-radio-ended_auctions');
   await endedAuctionsBtn.waitFor({ state: 'attached' });
@@ -49,7 +39,7 @@ export async function collectAuctions() {
   while (shouldCollect) {
     try {
       for (let car of await page.locator('.acv-infinite-scroller-item').all()) {
-        const link = await car.locator('a');
+        const link = await car.locator('a:not(.mail-to)');
         const href = await link.getAttribute('href');
         auctionIds.add(href.match(/\d+/)[0]);
       }
@@ -64,8 +54,7 @@ export async function collectAuctions() {
         await delay(500);
       });
     } catch (e) {
-      await context.close();
-      await browser.close();
+      await closeBrowser(browser, context);
       throw new Error(e);
     }
 
@@ -76,8 +65,7 @@ export async function collectAuctions() {
     }
   }
 
-  await context.close();
-  await browser.close();
+  await closeBrowser(browser, context);
 
   return [...auctionIds];
 }
@@ -163,27 +151,9 @@ const getCarModel = async (auctionId, page) => {
 };
 
 export async function scrapAuctions(auctionIds) {
-  const browser = isDev()
-    ? await playwright.chromium.launch({
-        headless: false,
-      })
-    : await playwright.chromium.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-      });
-  const context = await browser.newContext(devices['Desktop Chrome']);
-  const page = await context.newPage();
+  const { page, browser, context } = await launchBrowser();
 
-  await page.goto('https://app.acvauctions.com/login');
-
-  await page
-    .getByRole('textbox', { name: /email address/i })
-    .fill(process.env.ACV_AUCTIONS_USER);
-  await page
-    .getByRole('textbox', { name: /password/i })
-    .fill(process.env.ACV_AUCTIONS_PASS);
-  await page.getByRole('button', { name: /log in/i }).click();
+  await login(page);
 
   await page.waitForURL('https://app.acvauctions.com/search?l=live');
 
@@ -191,32 +161,24 @@ export async function scrapAuctions(auctionIds) {
 
   for (const auctionId of auctionIds) {
     try {
-      const car = await getCarModel(auctionId, page);
+      const isAlreadyProcessed = await getProcessedAuction(auctionId);
+      if (!isAlreadyProcessed) {
+        const car = await getCarModel(auctionId, page);
 
-      if (car) {
-        cars.push(car);
+        if (car) {
+          cars.push(car);
+        }
       }
     } catch (e) {
-      console.log('::: scrapAuctions :::');
+      console.log('::: scrapAuctions catch :::');
       console.log(e);
     }
   }
 
-  const result = cars.filter((car) => {
-    return (
-      !car.condition.some((report) => {
-        return ['isInoperable', 'doesNotStart'].includes(report);
-      }) && car.odometer.value !== -1
-    );
-  });
-
-  await context.close();
-  await browser.close();
+  await closeBrowser(browser, context);
 
   console.log('::::  srcapped cars :::::');
   console.log(cars.length);
-  console.log('::::  cars to proQuote :::::');
-  console.log(result.length);
 
-  return result;
+  return cars;
 }
