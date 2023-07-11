@@ -85,7 +85,9 @@ const getCarModel = async (auctionId, page) => {
     'color',
   ];
 
-  let carModel = {};
+  let carModel = {
+    status: 1,
+  };
 
   const title = page.locator('.vehicle-header-summary__name');
   await title.waitFor({

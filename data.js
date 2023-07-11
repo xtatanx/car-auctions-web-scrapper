@@ -1,7 +1,11 @@
 import { Firestore } from '@google-cloud/firestore';
 
 const db = new Firestore({
-  projectId: 'auctions-388714',
+  projectId: process.env.FIRESTORE_PROJECT_ID,
+  credentials: {
+    client_email: process.env.FIRESTORE_CLIENT_EMAIL,
+    private_key: process.env.FIRESTORE_PRIVATE_KEY,
+  },
 });
 
 export async function addProcessedAuctions(cars) {
