@@ -1,0 +1,32 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy_to_cloud_functions:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - uses: 'actions/checkout@v3'
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
+
+      - id: 'deploy'
+        name: 'Deploy to Cloud Functions'
+        uses: 'google-github-actions/deploy-cloud-functions@v1'
+        with:
+          name: 'auctions_scrapping'
+          runtime: 'nodejs18'
+          entry_point: 'initScrapping'
+          memory_mb: '2048'
+          region: 'us-east1'
+          min_instances: 0
+          max_instances: 1
