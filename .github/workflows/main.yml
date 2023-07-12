@@ -19,14 +19,10 @@ jobs:
         with:
           credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
 
-      - id: 'deploy'
-        name: 'Deploy to Cloud Functions'
-        uses: 'google-github-actions/deploy-cloud-functions@v1'
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
         with:
-          name: 'auctions_scrapping'
-          runtime: 'nodejs18'
-          entry_point: 'initScrapping'
-          memory_mb: '2048'
-          region: 'us-east1'
-          min_instances: 0
-          max_instances: 1
+          version: '>= 363.0.0'
+
+      - name: 'Deploy the functions using gcloud CLI'
+        run: 'gcloud functions deploy auctions_scrapping --gen2 --region=us-east1 --runtime=nodejs18 --source=. --entry-point=initScrapping --trigger-http'
