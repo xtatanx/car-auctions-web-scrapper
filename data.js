@@ -1,12 +1,17 @@
 import { Firestore } from '@google-cloud/firestore';
-
-const db = new Firestore({
+import { isDev } from './utils';
+const config = {
   projectId: process.env.FIRESTORE_PROJECT_ID,
-  credentials: {
+};
+
+if (isDev()) {
+  config.credentials = {
     client_email: process.env.FIRESTORE_CLIENT_EMAIL,
     private_key: process.env.FIRESTORE_PRIVATE_KEY,
-  },
-});
+  };
+}
+
+const db = new Firestore(config);
 
 export async function addProcessedAuctions(cars) {
   console.log('::: adding processed auctions :::');
